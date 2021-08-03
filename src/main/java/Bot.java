@@ -1,11 +1,8 @@
-import org.telegram.*;
-import org.telegram.telegrambots.TelegramBotsApi;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.CallbackQuery;
 import org.telegram.telegrambots.api.objects.Update;
 import org.telegram.telegrambots.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
 
@@ -66,7 +63,61 @@ public class Bot extends TelegramLongPollingBot {
                 game.nextQuestion();
                 game.rightAnswer();
                 break;
+            case "false":
+                game.nextQuestion();
+                break;
         }
+        SendMessage sendMessage = new SendMessage().setChatId(chatID);
+        if (game.getCurrentQuestion()<5){
+            setQuestion(sendMessage, game);
+        }else{
+            String end = "Игра окончена, Ваш результат: "+game.getRightAnswers()+"/5. Чтобы начать новую игру введите /start";
+            sendMessage.setText(end);
+        }
+        try {
+            execute(sendMessage);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void setQuestion(SendMessage sendMessage, Game game) {
+        String[] text = game.getQuestion(rb);
+        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
+        List<InlineKeyboardButton> line1 = new ArrayList<>();
+        InlineKeyboardButton button1 = new InlineKeyboardButton().setText(text[1]);
+        List<InlineKeyboardButton> line2 = new ArrayList<>();
+        InlineKeyboardButton button2 = new InlineKeyboardButton().setText(text[2]);
+        List<InlineKeyboardButton> line3 = new ArrayList<>();
+        InlineKeyboardButton button3 = new InlineKeyboardButton().setText(text[3]);
+        setTrueFalse(button1,button2,button3,game.getCurrentQuestion());
+        line1.add(button1);
+        line2.add(button2);
+        line3.add(button3);
+        buttons.add(line1);
+        buttons.add(line2);
+        buttons.add(line3);
+        inlineKeyboardMarkup.setKeyboard(buttons);
+        sendMessage.setReplyMarkup(inlineKeyboardMarkup);
+        sendMessage.setText(text[0]);
+    }
+
+    private void setTrueFalse(InlineKeyboardButton button1, InlineKeyboardButton button2, InlineKeyboardButton button3, int currentQuestion) {
+        if (currentQuestion%3==0){
+            button1.setCallbackData("false");
+            button2.setCallbackData("false");
+            button3.setCallbackData("true");
+        }else if (currentQuestion%3==1){
+            button1.setCallbackData("true");
+            button2.setCallbackData("false");
+            button3.setCallbackData("false");
+        }else if (currentQuestion%3==2){
+            button1.setCallbackData("false");
+            button2.setCallbackData("true");
+            button3.setCallbackData("false");
+        }
+
     }
 
     @Override
