@@ -7,6 +7,7 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="quiztelegrambot" />
+        <module name="quiztelegrammbot" />
         <module name="telegramBot2000Killier" />
       </profile>
     </annotationProcessing>
