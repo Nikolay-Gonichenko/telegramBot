@@ -1,1 +1,1 @@
-quiztelegrammbot: java Main.java
+quiztelegrammbot: java \src\main\java\Main.java
