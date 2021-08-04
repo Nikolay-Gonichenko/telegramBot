@@ -1,1 +1,1 @@
-quiztelegrammbot: java \src\main\java\Main.java
+worker: java Main.class
