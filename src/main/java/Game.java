@@ -10,7 +10,10 @@ public class Game {
         this.level = level;
         isStarted = true;
         currentQuestion = 1;
+        rightAnswers = 0;
     }
+
+
 
     public boolean isStarted() {
         return isStarted;
@@ -41,5 +44,14 @@ public class Game {
         request[2] = new String(rb.getString(answer2).getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
         request[3] = new String(rb.getString(answer3).getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
         return request;
+    }
+
+    public void end() {
+        isStarted = false;
+        level = 0;
+    }
+
+    public int getLevel() {
+        return level;
     }
 }
