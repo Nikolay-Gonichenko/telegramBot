@@ -6,39 +6,51 @@ import org.telegram.telegrambots.api.objects.replykeyboard.buttons.InlineKeyboar
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
 
+
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.ResourceBundle;
+import java.util.*;
 
 public class Bot extends TelegramLongPollingBot {
     private final String BOT_NAME = "@QuizProgrammingBot";
     private final String BOT_TOKEN = "1940873417:AAEc6jPqnHEclVm9h87pcm_04RMhnSneo4Y";
     private final Locale locale = new Locale("ru", "RU");
     private final ResourceBundle rb = ResourceBundle.getBundle("text", locale);
+    private final Map<String, User> users = new HashMap<>();
 
     @Override
     public void onUpdateReceived(Update update) {
         update.getUpdateId();
-        if (update.hasMessage()){
+        if (update.hasMessage()) {
             String message = update.getMessage().getText();
             handleText(message, update.getMessage().getChatId().toString());
-        }else if (update.hasCallbackQuery()){
+        } else if (update.hasCallbackQuery()) {
             handleQuery(update.getCallbackQuery(), String.valueOf(update.getCallbackQuery().getMessage().getChatId()));
         }
 
     }
 
     private void handleText(String message, String chatId) {
+        boolean check = true;
+        if (!users.containsKey(chatId)) {
+            users.put(chatId, new User(chatId));
+            check = true;
+        }else{
+            if (users.get(chatId).hasGame() && users.get(chatId).getGame().isStarted()){
+                check = false;
+            }
+        }
         SendMessage sendMessage = new SendMessage().setChatId(chatId);
         String[] text = message.split(" ");
         switch (text[0]) {
-            case "start":
-                setInline(sendMessage);
-                sendMessage.setText(setString("choseLevel"));
+            case "/start":
+                if (check){
+                    setInline(sendMessage);
+                    sendMessage.setText(setString("choseLevel"));
+                }else{
+                    sendMessage.setText("Вы уже начали игру. Закончите её.");
+                }
                 break;
-            case "help":
+            case "/help":
                 sendMessage.setText(setString("help"));
                 break;
             default:
@@ -51,28 +63,72 @@ public class Bot extends TelegramLongPollingBot {
             e.printStackTrace();
         }
     }
-    private void handleQuery(CallbackQuery callbackQuery, String chatID){
+
+    private void handleQuery(CallbackQuery callbackQuery, String chatID) {
         String text = callbackQuery.getData();
-        String[] checkText = text.split("");
-        Game game = new Game();
-        switch (checkText[0]){
+        String[] checkText = text.split(" ");
+        SendMessage sendMessage = new SendMessage().setChatId(chatID);
+        boolean checkQuestion = true;
+        boolean checkLevel = true;
+        boolean checkMatching = true;
+        if (!users.get(chatID).hasGame()) {
+            users.get(chatID).setGame(new Game());
+        }
+        Game game = users.get(chatID).getGame();
+        switch (checkText[0]) {
             case "Level":
-                game.start(Integer.parseInt(checkText[1]));
+                if (!game.isStarted()) {
+                    game.start(Integer.parseInt(checkText[1]));
+                    checkLevel = true;
+                } else {
+                    checkLevel = false;
+                }
                 break;
             case "true":
-                game.nextQuestion();
-                game.rightAnswer();
+                checkMatching = Integer.parseInt(checkText[2]) == game.getLevel();
+                if (checkMatching) {
+                    if (Integer.parseInt(checkText[1]) == game.getCurrentQuestion()) {
+                        game.nextQuestion();
+                        game.rightAnswer();
+                        checkQuestion = true;
+                    } else {
+                        checkQuestion = false;
+                    }
+                }
                 break;
             case "false":
-                game.nextQuestion();
+                checkMatching = Integer.parseInt(checkText[2]) == game.getLevel();
+                if (Integer.parseInt(checkText[1]) == game.getCurrentQuestion()) {
+                    game.nextQuestion();
+                    checkQuestion = true;
+                } else {
+                    checkQuestion = false;
+                }
                 break;
         }
-        SendMessage sendMessage = new SendMessage().setChatId(chatID);
-        if (game.getCurrentQuestion()<5){
-            setQuestion(sendMessage, game);
-        }else{
-            String end = "Игра окончена, Ваш результат: "+game.getRightAnswers()+"/5. Чтобы начать новую игру введите /start";
-            sendMessage.setText(end);
+        if (game.isStarted()) {
+            if (checkLevel) {
+                if (checkMatching) {
+                    if (checkQuestion) {
+                        if (game.getCurrentQuestion() <= 5) {
+                            setQuestion(sendMessage, game);
+                        } else {
+                            String end = "Игра окончена, Ваш результат: " + game.getRightAnswers() + "/5. Чтобы начать новую игру введите /start";
+                            sendMessage.setText(end);
+                            game.end();
+                        }
+                    } else {
+                        sendMessage.setText("Вы уже отвечали на этот вопрос в данной игре. " +
+                                "Сейчас Вам надо ответить на вопрос № " + game.getCurrentQuestion());
+                    }
+                } else {
+                    sendMessage.setText("Вы ответили на вопрос не из этого уровня");
+                }
+            } else {
+                sendMessage.setText("Вы уже начали уровень " + game.getLevel() + " . Закончите его сначала.");
+            }
+        } else {
+            sendMessage.setText("Вы закончили эту игру. Начните новую!");
         }
         try {
             execute(sendMessage);
@@ -91,7 +147,7 @@ public class Bot extends TelegramLongPollingBot {
         InlineKeyboardButton button2 = new InlineKeyboardButton().setText(text[2]);
         List<InlineKeyboardButton> line3 = new ArrayList<>();
         InlineKeyboardButton button3 = new InlineKeyboardButton().setText(text[3]);
-        setTrueFalse(button1,button2,button3,game.getCurrentQuestion());
+        setTrueFalse(button1, button2, button3, game.getCurrentQuestion(), game.getLevel());
         line1.add(button1);
         line2.add(button2);
         line3.add(button3);
@@ -103,19 +159,19 @@ public class Bot extends TelegramLongPollingBot {
         sendMessage.setText(text[0]);
     }
 
-    private void setTrueFalse(InlineKeyboardButton button1, InlineKeyboardButton button2, InlineKeyboardButton button3, int currentQuestion) {
-        if (currentQuestion%3==0){
-            button1.setCallbackData("false");
-            button2.setCallbackData("false");
-            button3.setCallbackData("true");
-        }else if (currentQuestion%3==1){
-            button1.setCallbackData("true");
-            button2.setCallbackData("false");
-            button3.setCallbackData("false");
-        }else if (currentQuestion%3==2){
-            button1.setCallbackData("false");
-            button2.setCallbackData("true");
-            button3.setCallbackData("false");
+    private void setTrueFalse(InlineKeyboardButton button1, InlineKeyboardButton button2, InlineKeyboardButton button3, int currentQuestion, int level) {
+        if (currentQuestion % 3 == 0) {
+            button1.setCallbackData("false " + currentQuestion + " " + level);
+            button2.setCallbackData("false " + currentQuestion + " " + level);
+            button3.setCallbackData("true " + currentQuestion + " " + level);
+        } else if (currentQuestion % 3 == 1) {
+            button1.setCallbackData("true " + currentQuestion + " " + level);
+            button2.setCallbackData("false " + currentQuestion + " " + level);
+            button3.setCallbackData("false " + currentQuestion + " " + level);
+        } else if (currentQuestion % 3 == 2) {
+            button1.setCallbackData("false " + currentQuestion + " " + level);
+            button2.setCallbackData("true " + currentQuestion + " " + level);
+            button3.setCallbackData("false " + currentQuestion + " " + level);
         }
 
     }
@@ -145,7 +201,8 @@ public class Bot extends TelegramLongPollingBot {
         inlineKeyboardMarkup.setKeyboard(buttons);
         sendMessage.setReplyMarkup(inlineKeyboardMarkup);
     }
-    private String setString(String text){
+
+    private String setString(String text) {
         String stringToSet = rb.getString(text);
         stringToSet = new String(stringToSet.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
         return stringToSet;
